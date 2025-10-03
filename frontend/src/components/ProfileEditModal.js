@@ -8,11 +8,14 @@ const ProfileEditModal = ({ initial = {}, onClose, onSave }) => {
     const [bio, setBio] = useState(initial.bio || '');
     const [socialLinks, setSocialLinks] = useState(initial.social_links || { website: '', telegram: '', discord: '' });
     const [selectedSticker, setSelectedSticker] = useState(initial.sticker || null);
-    const [customId, setCustomId] = useState(initial.customId || '');
 
     const [avatarFile, setAvatarFile] = useState(null);
     const [coverFile, setCoverFile] = useState(null);
     const [uploading, setUploading] = useState(false);
+
+    // Ограничения символов
+    const NICKNAME_MAX_LENGTH = 30;
+    const BIO_MAX_LENGTH = 200;
 
     const sheetRef = useRef(null);
 
@@ -75,7 +78,12 @@ const ProfileEditModal = ({ initial = {}, onClose, onSave }) => {
             }
 
             // Затем отправляем остальные обновления
-            const updates = { nickname, bio, social_links: socialLinks, sticker: selectedSticker, customId };
+            const updates = { 
+                nickname: nickname.trim(), 
+                bio: bio.trim(), 
+                social_links: socialLinks, 
+                sticker: selectedSticker
+            };
             await onSave(updates);
         } catch (err) {
             console.error('save profile error', err);
@@ -104,12 +112,21 @@ const ProfileEditModal = ({ initial = {}, onClose, onSave }) => {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-muted-theme mb-1">Ник</label>
-                            <input value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full bg-theme-2 border border-theme rounded-lg px-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-muted-theme mb-1">ID страницы</label>
-                            <input value={customId} onChange={(e) => setCustomId(e.target.value)} className="w-full bg-theme-2 border border-theme rounded-lg px-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-sm font-medium text-muted-theme">Ник</label>
+                                <span className="text-xs text-muted-theme">{nickname.length}/{NICKNAME_MAX_LENGTH}</span>
+                            </div>
+                            <input 
+                                value={nickname} 
+                                onChange={(e) => {
+                                    if (e.target.value.length <= NICKNAME_MAX_LENGTH) {
+                                        setNickname(e.target.value);
+                                    }
+                                }} 
+                                placeholder="Ваш никнейм"
+                                maxLength={NICKNAME_MAX_LENGTH}
+                                className="w-full bg-theme-2 border border-theme rounded-lg px-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" 
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-muted-theme mb-1">Стикер (бейдж)</label>
@@ -121,8 +138,22 @@ const ProfileEditModal = ({ initial = {}, onClose, onSave }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-muted-theme mb-1">О себе</label>
-                        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full bg-theme-2 border border-theme rounded-lg px-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple"></textarea>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="block text-sm font-medium text-muted-theme">О себе</label>
+                            <span className="text-xs text-muted-theme">{bio.length}/{BIO_MAX_LENGTH}</span>
+                        </div>
+                        <textarea 
+                            value={bio} 
+                            onChange={(e) => {
+                                if (e.target.value.length <= BIO_MAX_LENGTH) {
+                                    setBio(e.target.value);
+                                }
+                            }} 
+                            placeholder="Расскажите о себе..."
+                            maxLength={BIO_MAX_LENGTH}
+                            rows={3} 
+                            className="w-full bg-theme-2 border border-theme rounded-lg px-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple"
+                        ></textarea>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -149,15 +180,15 @@ const ProfileEditModal = ({ initial = {}, onClose, onSave }) => {
                         <div className="space-y-3">
                             <div className="relative">
                                 <GlobeAltIcon className="w-5 h-5 text-muted-theme absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input value={socialLinks.website} onChange={(e) => handleSocialChange('website', e.target.value)} placeholder="Веб-сайт" className="w-full bg-theme-2 border border-theme rounded-lg pl-10 pr-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
+                                <input value={socialLinks.website} onChange={(e) => handleSocialChange('website', e.target.value)} placeholder="Ваша ссылка на веб-сайт" className="w-full bg-theme-2 border border-theme rounded-lg pl-10 pr-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
                             </div>
                             <div className="relative">
                                 <AtSymbolIcon className="w-5 h-5 text-muted-theme absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input value={socialLinks.telegram} onChange={(e) => handleSocialChange('telegram', e.target.value)} placeholder="Telegram" className="w-full bg-theme-2 border border-theme rounded-lg pl-10 pr-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
+                                <input value={socialLinks.telegram} onChange={(e) => handleSocialChange('telegram', e.target.value)} placeholder="Ваш ID в Telegram" className="w-full bg-theme-2 border border-theme rounded-lg pl-10 pr-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
                             </div>
                             <div className="relative">
                                 <ChatAlt2Icon className="w-5 h-5 text-muted-theme absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input value={socialLinks.discord} onChange={(e) => handleSocialChange('discord', e.target.value)} placeholder="Discord" className="w-full bg-theme-2 border border-theme rounded-lg pl-10 pr-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
+                                <input value={socialLinks.discord} onChange={(e) => handleSocialChange('discord', e.target.value)} placeholder="Ваш ID в Discord" className="w-full bg-theme-2 border border-theme rounded-lg pl-10 pr-3 py-2 text-theme focus:ring-2 focus:ring-brand-purple" />
                             </div>
                         </div>
                     </div>

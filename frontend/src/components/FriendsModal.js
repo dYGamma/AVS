@@ -12,7 +12,7 @@ const FriendsModal = ({ friends, onClose }) => {
         <div className="space-y-3 max-h-96 overflow-y-auto">
           {friends.map(friend => {
             const friendAvatar = friend.avatar_url || `https://i.pravatar.cc/40?u=${friend._id || friend.id}`;
-            const friendLink = `/profile/${friend.customId || friend._id}`;
+            const friendLink = `/profile/${friend._id}`;
             return (
               <Link to={friendLink} key={friend._id || friend.id} className="flex items-center space-x-4 bg-theme-2 p-3 rounded-lg hover:bg-theme-3 transition-colors">
                 <img src={friendAvatar} alt="avatar" className="w-12 h-12 rounded-full object-cover" />

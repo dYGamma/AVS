@@ -31,8 +31,8 @@ const LoginPage = () => {
             // Обновляем глобальное состояние авторизации
             setAuth({ isAuth: true, user: response.data.user, isLoading: false });
             // Перенаправляем пользователя на страницу профиля после успешного входа
-            const userId = response.data.user.id || response.data.user._id;
-            navigate(`/profile/${userId}`);
+            const profileId = response.data.user.id || response.data.user._id;
+            navigate(`/profile/${profileId}`);
         } catch (err) {
             console.error('Login failed', err);
             // Устанавливаем сообщение об ошибке для отображения пользователю

@@ -10,7 +10,16 @@ const AnimeEntrySchema = new Schema({
         type: String,
         enum: ['watching', 'completed', 'dropped', 'planned'],
         required: true,
-    }
+    },
+    last_watched_at: { type: Date }
+}, { _id: false });
+
+const WatchHistorySchema = new Schema({
+    mal_id: { type: String, required: true },
+    shikimori_id: { type: String },
+    title: { type: String },
+    episode: { type: Number, required: true },
+    watched_at: { type: Date, default: Date.now }
 }, { _id: false });
 
 const SocialLinksSchema = new Schema({
@@ -22,9 +31,6 @@ const SocialLinksSchema = new Schema({
 }, { _id: false });
 
 const UserSchema = new Schema({
-    // Убираем определение индекса из самого поля, чтобы задать его явно ниже.
-    userId: { type: String },
-
     email: { type: String, unique: true, required: true, lowercase: true, trim: true },
     password: { type: String, required: true },
 
@@ -41,32 +47,9 @@ const UserSchema = new Schema({
     friendRequestsSent: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     friendRequestsReceived: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 
-    customId: {
-        type: String,
-        unique: true,
-        sparse: true, // Индекс уникальности будет применяться только к документам, где это поле существует
-        validate: {
-            validator: function(v) {
-                return /^[a-zA-Z0-9_]+$/.test(v);
-            },
-            message: props => `${props.value} is not a valid custom ID! Only letters, numbers, and underscores are allowed.`
-        }
-    },
-
-    anime_list: { type: [AnimeEntrySchema], default: [] }
+    anime_list: { type: [AnimeEntrySchema], default: [] },
+    watch_history: { type: [WatchHistorySchema], default: [] }
 }, { timestamps: true });
-
-// Явно определяем частичный (partial) уникальный индекс.
-// Это самый надёжный способ для опциональных уникальных полей.
-// Индекс будет применяться только к документам, где поле `userId` существует и является строкой.
-// Документы, где `userId` равен `null` или отсутствует, будут полностью проигнорированы этим индексом.
-UserSchema.index(
-    { userId: 1 },
-    {
-        unique: true,
-        partialFilterExpression: { userId: { $type: 'string' } }
-    }
-);
 
 
 module.exports = model('User', UserSchema);

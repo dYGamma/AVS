@@ -5,6 +5,7 @@ import api from '../api';
 import { AuthContext } from '../App';
 import ProfileEditModal from '../components/ProfileEditModal';
 import FriendsModal from '../components/FriendsModal';
+import DetailedStatsModal from '../components/DetailedStatsModal';
 import Loader from '../components/Loader';
 import { UserIcon } from '@heroicons/react/outline';
 
@@ -14,7 +15,7 @@ const ProfilePage = () => {
   const navigate = useNavigate();
 
   // Надёжно получаем id целевого профиля: либо из URL, либо из авторизованного юзера (.id или ._id)
-  const targetId = params.id || auth?.user?.customId || auth?.user?.id || auth?.user?._id || null;
+  const targetId = params.id || auth?.user?.id || auth?.user?._id || null;
 
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
@@ -24,6 +25,8 @@ const ProfilePage = () => {
   const [editing, setEditing] = useState(false);
   const [friendLoading, setFriendLoading] = useState(false);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [bioFrameStyle, setBioFrameStyle] = useState('default');
 
   // Не редиректим до тех пор, пока не известен статус авторизации (auth.isLoading)
   useEffect(() => {
@@ -203,12 +206,17 @@ const ProfilePage = () => {
               {/* Inline sticker near nickname (единственный бейдж) */}
               {stickerSrc && <img src={stickerSrc} alt="sticker-inline" className="sticker-inline" />}
             </div>
-            <p className="text-sm md:text-base text-gray-300 max-w-xs md:max-w-md truncate">
-              {profile.bio || '—'}
-            </p>
           </div>
         </div>
       </div>
+
+      {/* Описание профиля под обложкой */}
+      {profile.bio && (
+        <div className="card mb-6 border-l-4 border-accent">
+          <h3 className="font-bold text-theme mb-3">О себе</h3>
+          <p className="text-theme whitespace-pre-wrap break-words">{profile.bio}</p>
+        </div>
+      )}
 
       <div className="profile-grid">
         {/* Left column: actions, friends & social */}
@@ -267,7 +275,7 @@ const ProfilePage = () => {
                   const friendStickerSrc = friendSticker
                     ? (String(friendSticker).startsWith('http') ? friendSticker : `/assets/stickers/${friendSticker}.png`)
                     : null;
-                  const friendLink = `/profile/${friend.customId || friend._id}`;
+                  const friendLink = `/profile/${friend._id}`;
                   return (
                     <Link to={friendLink} key={friend._id || friend.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-theme-3 transition-colors">
                       <div className="relative w-10 h-10">
@@ -346,28 +354,33 @@ const ProfilePage = () => {
 
         {/* Right column: stats, recent */}
         <div className="space-y-4">
-          <div className="card flex items-center justify-between">
-            <div>
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-lg text-theme">Статистика</h3>
-              <div className="flex flex-wrap items-center mt-2 gap-3 text-sm text-muted-theme">
-                <div>
-                  Всего: <span className="font-semibold text-theme">{stats?.total ?? '—'}</span>
-                </div>
-                <div>
-                  Смотрю: <span className="font-semibold">{stats?.watching ?? 0}</span>
-                </div>
-                <div>
-                  В планах: <span className="font-semibold">{stats?.planned ?? 0}</span>
-                </div>
-                <div>
-                  Просмотрено: <span className="font-semibold">{stats?.completed ?? 0}</span>
-                </div>
-                <div>
-                  Брошено: <span className="font-semibold">{stats?.dropped ?? 0}</span>
-                </div>
+              <button
+                onClick={() => setShowStatsModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-theme-2 hover:bg-theme-3 text-theme text-sm font-medium transition-colors touch-target"
+              >
+                Подробнее
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-theme">
+              <div>
+                Всего: <span className="font-semibold text-theme">{stats?.total ?? '—'}</span>
+              </div>
+              <div>
+                Смотрю: <span className="font-semibold">{stats?.watching ?? 0}</span>
+              </div>
+              <div>
+                В планах: <span className="font-semibold">{stats?.planned ?? 0}</span>
+              </div>
+              <div>
+                Просмотрено: <span className="font-semibold">{stats?.completed ?? 0}</span>
+              </div>
+              <div>
+                Брошено: <span className="font-semibold">{stats?.dropped ?? 0}</span>
               </div>
             </div>
-
           </div>
 
           <div className="card">
@@ -376,21 +389,36 @@ const ProfilePage = () => {
               <p className="text-muted-theme">Нет недавно просмотренных эпизодов.</p>
             ) : (
               <div className="space-y-2">
-                {recent.map((r, i) => (
-                  <div key={`${r.mal_id}-${r.watched_at}-${i}`} className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-theme truncate text-truncate">{r.title || r.mal_id}</div>
-                      <div className="text-sm text-muted-theme">
-                        Серия {r.episode} — {new Date(r.watched_at).toLocaleString()}
+                {recent.map((r, i) => {
+                  const animeId = r.mal_id || r.shikimori_id;
+                  const episodeNum = r.episode || '';
+                  const watchDate = r.watched_at ? new Date(r.watched_at).toLocaleString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : '';
+                  
+                  return (
+                    <div key={`${animeId}-${r.watched_at}-${i}`} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-theme-2 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-theme truncate">{r.title || animeId}</div>
+                        <div className="text-sm text-muted-theme">
+                          {episodeNum && `Серия ${episodeNum}`}
+                          {episodeNum && watchDate && ' • '}
+                          {watchDate}
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <button onClick={() => navigate(`/anime/${r.mal_id}`)} className="px-3 py-1 rounded-lg bg-theme-2 text-theme touch-target">
+                      <button 
+                        onClick={() => navigate(`/anime/${animeId}`)} 
+                        className="px-3 py-1.5 rounded-lg bg-theme-2 hover:bg-theme-3 text-theme text-sm font-medium transition-colors touch-target flex-shrink-0"
+                      >
                         Открыть
                       </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -399,6 +427,7 @@ const ProfilePage = () => {
 
       {editing && <ProfileEditModal initial={profile} onClose={() => setEditing(false)} onSave={handleSave} />}
       {showFriendsModal && <FriendsModal friends={profile.friends} onClose={() => setShowFriendsModal(false)} />}
+      {showStatsModal && <DetailedStatsModal userId={targetId} onClose={() => setShowStatsModal(false)} />}
     </div>
   );
 };

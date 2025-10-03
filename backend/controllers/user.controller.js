@@ -112,10 +112,11 @@ class UserController {
             const { id } = req.params;
             if (!id) return next(ApiError.BadRequest('Не указан id пользователя'));
 
-            const user = await (mongoose.Types.ObjectId.isValid(id)
-                ? UserService.getUserById(id)
-                : UserService.getUserByCustomId(id));
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return next(ApiError.BadRequest('Неверный id пользователя'));
+            }
 
+            const user = await UserService.getUserById(id);
             if (!user) return next(ApiError.BadRequest('Профиль не найден'));
 
             const dto = new UserDto(user);
@@ -163,7 +164,7 @@ class UserController {
             if (!userId) return next(ApiError.UnauthorizedError());
 
             // Ограничиваем набор полей, которые можно обновлять (безопасность)
-            const allowed = ['nickname', 'bio', 'social_links', 'sticker', 'theme', 'displayName', 'customId'];
+            const allowed = ['nickname', 'bio', 'social_links', 'sticker', 'theme', 'displayName'];
             const updates = {};
             for (const key of allowed) {
                 if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -319,6 +320,45 @@ class UserController {
             return res.json(data || []);
         } catch (e) {
             console.error('getDynamics error:', e?.message || e);
+            next(e);
+        }
+    }
+
+    // Записать просмотр эпизода (защищённый)
+    async recordWatchHistory(req, res, next) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) return next(ApiError.UnauthorizedError());
+
+            const { mal_id, shikimori_id, title, episode } = req.body;
+            if (!mal_id && !shikimori_id) return next(ApiError.BadRequest('Не указан id аниме'));
+            if (!episode) return next(ApiError.BadRequest('Не указан номер эпизода'));
+
+            await UserService.recordWatchHistory(userId, {
+                mal_id: mal_id || shikimori_id,
+                shikimori_id: shikimori_id || mal_id,
+                title,
+                episode
+            });
+
+            return res.json({ ok: true });
+        } catch (e) {
+            console.error('recordWatchHistory error:', e?.message || e);
+            next(e);
+        }
+    }
+
+    // Получить подробную статистику по категориям (публичная)
+    async getDetailedStats(req, res, next) {
+        try {
+            const userId = req.params.id;
+            if (!userId) return next(ApiError.BadRequest('Не указан id пользователя'));
+            
+            const category = req.query.category; // watching, completed, planned, dropped
+            const data = await UserService.getDetailedStats(userId, category);
+            return res.json(data || []);
+        } catch (e) {
+            console.error('getDetailedStats error:', e?.message || e);
             next(e);
         }
     }

@@ -227,15 +227,7 @@ class UserService {
         if (!mongoose.Types.ObjectId.isValid(id)) throw ApiError.BadRequest('Неверный id пользователя');
 
         // Если друзья хранятся как ObjectId, популяция даёт краткую информацию
-        const user = await UserModel.findById(id).populate('friends', 'nickname avatar_url email sticker customId').lean();
-        if (!user) throw ApiError.BadRequest('Пользователь не найден');
-        return user;
-    }
-
-    async getUserByCustomId(customId) {
-        if (!customId) throw ApiError.BadRequest('Не указан customId пользователя');
-
-        const user = await UserModel.findOne({ customId }).populate('friends', 'nickname avatar_url email sticker customId').lean();
+        const user = await UserModel.findById(id).populate('friends', 'nickname avatar_url email sticker').lean();
         if (!user) throw ApiError.BadRequest('Пользователь не найден');
         return user;
     }
@@ -249,7 +241,7 @@ class UserService {
         if (!user) throw ApiError.BadRequest('Пользователь не найден');
 
         // Поля, которые разрешаем обновлять
-        const allowed = ['nickname', 'bio', 'avatar_url', 'cover_url', 'social_links', 'sticker', 'theme', 'displayName', 'customId'];
+        const allowed = ['nickname', 'bio', 'avatar_url', 'cover_url', 'social_links', 'sticker', 'theme', 'displayName'];
         let changed = false;
         for (const key of allowed) {
             if (updates[key] !== undefined) {
@@ -345,6 +337,13 @@ class UserService {
         user.friends.push(requesterId);
         requester.friends.push(userId);
 
+        // Удаляем уведомление о заявке в друзья из базы данных
+        await NotificationModel.deleteMany({
+            user: userId,
+            type: 'friend_request',
+            from: requesterId
+        });
+
         await user.save();
         await requester.save();
 
@@ -366,6 +365,13 @@ class UserService {
 
         user.friendRequestsReceived = user.friendRequestsReceived.filter(id => id.toString() !== requesterId.toString());
         requester.friendRequestsSent = requester.friendRequestsSent.filter(id => id.toString() !== userId.toString());
+
+        // Удаляем уведомление о заявке в друзья из базы данных
+        await NotificationModel.deleteMany({
+            user: userId,
+            type: 'friend_request',
+            from: requesterId
+        });
 
         await user.save();
         await requester.save();
@@ -423,21 +429,79 @@ class UserService {
         if (Array.isArray(user.watch_history) && user.watch_history.length > 0) {
             const sorted = user.watch_history
                 .slice()
-                .sort((a, b) => new Date(b.at) - new Date(a.at));
+                .sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
             return sorted.slice(0, limit);
-        }
-
-        if (Array.isArray(user.recent) && user.recent.length > 0) {
-            return user.recent.slice(0, limit);
         }
 
         const candidates = (user.anime_list || [])
             .filter(a => a.last_watched_at)
-            .map(a => ({ shikimori_id: a.shikimori_id, title: a.title, last_watched_at: a.last_watched_at }))
-            .sort((a, b) => new Date(b.last_watched_at) - new Date(a.last_watched_at))
+            .map(a => ({ 
+                mal_id: a.shikimori_id, 
+                shikimori_id: a.shikimori_id, 
+                title: a.title, 
+                watched_at: a.last_watched_at 
+            }))
+            .sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at))
             .slice(0, limit);
 
         return candidates;
+    }
+
+    /**
+     * Записать просмотр эпизода в историю
+     */
+    async recordWatchHistory(userId, watchData) {
+        const user = await UserModel.findById(userId);
+        if (!user) throw ApiError.BadRequest('Пользователь не найден');
+
+        // Добавляем запись в историю
+        user.watch_history.push({
+            mal_id: watchData.mal_id,
+            shikimori_id: watchData.shikimori_id,
+            title: watchData.title,
+            episode: watchData.episode,
+            watched_at: new Date()
+        });
+
+        // Обновляем last_watched_at в anime_list если аниме там есть
+        const animeIndex = user.anime_list.findIndex(
+            a => String(a.shikimori_id) === String(watchData.mal_id) || 
+                 String(a.shikimori_id) === String(watchData.shikimori_id)
+        );
+        if (animeIndex > -1) {
+            user.anime_list[animeIndex].last_watched_at = new Date();
+        }
+
+        // Ограничиваем историю последними 100 записями
+        if (user.watch_history.length > 100) {
+            user.watch_history = user.watch_history.slice(-100);
+        }
+
+        await user.save();
+        return user.watch_history;
+    }
+
+    /**
+     * Получить подробную статистику по категории
+     */
+    async getDetailedStats(userId, category) {
+        const user = await UserModel.findById(userId).lean();
+        if (!user) throw ApiError.BadRequest('Пользователь не найден');
+
+        const list = user.anime_list || [];
+        
+        if (category) {
+            // Возвращаем аниме конкретной категории
+            return list.filter(a => a.status === category);
+        }
+
+        // Возвращаем всё с группировкой
+        return {
+            watching: list.filter(a => a.status === 'watching'),
+            completed: list.filter(a => a.status === 'completed'),
+            planned: list.filter(a => a.status === 'planned'),
+            dropped: list.filter(a => a.status === 'dropped')
+        };
     }
 
     /**

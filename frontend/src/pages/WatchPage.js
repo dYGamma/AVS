@@ -1,8 +1,9 @@
 // /frontend/src/pages/WatchPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useLocation, Navigate } from 'react-router-dom';
 import api from '../api';
 import Loader from '../components/Loader';
+import { AuthContext } from '../App';
 
 const WatchPage = () => {
   const { id } = useParams(); // mal_id из URL
@@ -14,6 +15,7 @@ const WatchPage = () => {
   const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [loading, setLoading] = useState(!location.state?.playerData);
   const [error, setError] = useState('');
+  const { auth } = useContext(AuthContext);
 
   useEffect(() => {
     // Если playerData уже есть (переход с AnimePage), ничего не делаем
@@ -81,6 +83,28 @@ const WatchPage = () => {
 
   const episodesTotal = playerData.episodes_total || playerData.episodes_count || 1;
 
+  // Записываем просмотр эпизода в историю
+  const recordWatch = async (episode) => {
+    if (!auth?.isAuth) return;
+    
+    try {
+      await api.post('/users/watch-history', {
+        mal_id: id,
+        shikimori_id: id,
+        title: animeTitle,
+        episode: episode
+      });
+    } catch (err) {
+      console.error('Failed to record watch history:', err);
+    }
+  };
+
+  // Обработчик смены эпизода
+  const handleEpisodeChange = (ep) => {
+    setSelectedEpisode(ep);
+    recordWatch(ep);
+  };
+
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">{animeTitle} — Серия {selectedEpisode}</h1>
@@ -102,7 +126,7 @@ const WatchPage = () => {
           {Array.from({ length: episodesTotal }, (_, i) => i + 1).map((ep) => (
             <button
               key={ep}
-              onClick={() => setSelectedEpisode(ep)}
+              onClick={() => handleEpisodeChange(ep)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 selectedEpisode === ep
                   ? 'bg-brand-purple text-white'

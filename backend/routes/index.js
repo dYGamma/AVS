@@ -55,6 +55,8 @@ router.delete('/users/:id/friend', authMiddleware, UserController.removeFriend);
 router.get('/users/:id/stats', UserController.getStats);
 router.get('/users/:id/recent', UserController.getRecent);
 router.get('/users/:id/dynamics', UserController.getDynamics);
+router.get('/users/:id/detailed-stats', UserController.getDetailedStats);
+router.post('/users/watch-history', authMiddleware, UserController.recordWatchHistory);
 
 // --- Уведомления ---
 router.get('/notifications', authMiddleware, UserController.getNotifications);
